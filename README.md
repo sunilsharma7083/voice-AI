@@ -96,12 +96,16 @@ python voice_persona_model.py
   - Spectral centroid
 
 ### 4. AgeEstimator
-- **Method**: Heuristic rules based on acoustic features
-- **Age Groups**:
-  - Child (0-12)
-  - Young Adult (13-30)
-  - Adult (31-50)
-  - Senior (51+)
+- **Method**: Enhanced heuristic rules based on acoustic features
+- **Age Groups** (8 categories):
+  - Infant (0-3)
+  - Child (4-12)
+  - Teenager (13-17)
+  - Young Adult (18-25)
+  - Adult (26-40)
+  - Middle-Aged (41-55)
+  - Senior (56-70)
+  - Elderly (71+)
 
 ### 5. VoiceMemory
 - **Backend**: FAISS (Facebook AI Similarity Search)
@@ -114,7 +118,7 @@ python voice_persona_model.py
 {
     "transcription": "Hello, how are you?",
     "detected_language": "English",
-    "estimated_age_group": "Adult (31-50)",
+    "estimated_age_group": "Adult (26-40)",
     "speaker_embedding": tensor([...]),  # 1024-dim vector
     "acoustic_features": tensor([...]),   # [pitch, energy, zcr, spectral_centroid]
     "similar_profiles": [                 # Top-K similar profiles
@@ -125,17 +129,22 @@ python voice_persona_model.py
 
 ## 🎯 Age Detection Algorithm
 
-The age estimator uses acoustic features to classify speakers:
+The age estimator uses enhanced acoustic features to classify speakers into 8 detailed age groups:
 
 - **Pitch**: Higher pitch → Younger speaker
 - **Spectral Centroid**: Higher frequencies → Younger speaker
 - **Energy**: Voice strength and clarity
+- **Zero-Crossing Rate**: Voice texture and quality
 
-### Heuristic Rules:
-- Pitch > 250 Hz → Child
-- Pitch > 180 Hz + High Spectral Centroid → Young Adult
-- Pitch > 120 Hz → Adult
-- Otherwise → Senior
+### Enhanced Heuristic Rules:
+- **Pitch > 300 Hz + High Spectral Centroid** → Infant (0-3)
+- **Pitch > 250 Hz + High Spectral Features** → Child (4-12)
+- **Pitch > 200 Hz + High Energy** → Teenager (13-17)
+- **Pitch > 160 Hz + Clear Voice** → Young Adult (18-25)
+- **Pitch > 130 Hz + Stable Features** → Adult (26-40)
+- **Pitch > 110 Hz + Moderate Features** → Middle-Aged (41-55)
+- **Pitch > 90 Hz + Lower Energy** → Senior (56-70)
+- **Lower Pitch + Reduced Energy** → Elderly (71+)
 
 ## 🌐 Supported Languages
 
@@ -166,7 +175,7 @@ model.enroll(
         "region": "Mumbai",
         "gender": "Male",
         "language": "Hindi",
-        "age_group": "Adult (31-50)",
+        "age_group": "Adult (26-40)",
         "occupation": "Teacher"
     }
 )

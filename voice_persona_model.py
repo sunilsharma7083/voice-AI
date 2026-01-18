@@ -188,16 +188,28 @@ class AgeEstimator(torch.nn.Module):
         super().__init__()
         # Simple MLP for age estimation based on acoustic features
         self.mlp = torch.nn.Sequential(
-            torch.nn.Linear(4, 64),
+            torch.nn.Linear(4, 128),
+            torch.nn.ReLU(),
+            torch.nn.Dropout(0.3),
+            torch.nn.Linear(128, 64),
             torch.nn.ReLU(),
             torch.nn.Dropout(0.3),
             torch.nn.Linear(64, 32),
             torch.nn.ReLU(),
             torch.nn.Dropout(0.3),
-            torch.nn.Linear(32, 4)  # 4 age groups
+            torch.nn.Linear(32, 8)  # 8 age groups
         ).to(DEVICE)
         
-        self.age_groups = ["Child (0-12)", "Young Adult (13-30)", "Adult (31-50)", "Senior (51+)"]
+        self.age_groups = [
+            "Infant (0-3)",
+            "Child (4-12)", 
+            "Teenager (13-17)",
+            "Young Adult (18-25)",
+            "Adult (26-40)",
+            "Middle-Aged (41-55)",
+            "Senior (56-70)",
+            "Elderly (71+)"
+        ]
     
     @torch.no_grad()
     def forward(self, acoustic_features):
@@ -205,17 +217,43 @@ class AgeEstimator(torch.nn.Module):
         # Rule-based age estimation (heuristic approach)
         pitch_mean = acoustic_features[0].item()
         energy_mean = acoustic_features[1].item()
+        zcr_mean = acoustic_features[2].item()
         spectral_centroid = acoustic_features[3].item()
         
-        # Heuristic rules for age estimation
-        if pitch_mean > 250:  # Hz
-            age_group = "Child (0-12)"
-        elif pitch_mean > 180 and spectral_centroid > 2000:
-            age_group = "Young Adult (13-30)"
-        elif pitch_mean > 120:
-            age_group = "Adult (31-50)"
+        # Enhanced heuristic rules for age estimation
+        # Based on acoustic characteristics that change with age
+        
+        # Very high pitch + high spectral features = Infant/very young child
+        if pitch_mean > 300 and spectral_centroid > 2500:
+            age_group = "Infant (0-3)"
+        
+        # High pitch (typical of children)
+        elif pitch_mean > 250 and spectral_centroid > 2200:
+            age_group = "Child (4-12)"
+        
+        # Moderately high pitch with high energy (teenagers going through voice changes)
+        elif pitch_mean > 200 and energy_mean > 0.01 and spectral_centroid > 2000:
+            age_group = "Teenager (13-17)"
+        
+        # Clear, energetic voice (young adults)
+        elif pitch_mean > 160 and spectral_centroid > 1800 and energy_mean > 0.008:
+            age_group = "Young Adult (18-25)"
+        
+        # Stable voice characteristics (adults)
+        elif pitch_mean > 130 and spectral_centroid > 1500:
+            age_group = "Adult (26-40)"
+        
+        # Slightly lower pitch, stable energy (middle-aged)
+        elif pitch_mean > 110 and spectral_centroid > 1200:
+            age_group = "Middle-Aged (41-55)"
+        
+        # Lower pitch, potentially reduced energy (seniors)
+        elif pitch_mean > 90 or (energy_mean > 0.005 and spectral_centroid > 1000):
+            age_group = "Senior (56-70)"
+        
+        # Lowest pitch and energy characteristics (elderly)
         else:
-            age_group = "Senior (51+)"
+            age_group = "Elderly (71+)"
         
         return age_group
 
