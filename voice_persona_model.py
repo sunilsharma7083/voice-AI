@@ -5,12 +5,8 @@ import numpy as np
 from transformers import (
     WhisperProcessor,
     WhisperForConditionalGeneration,
-    Wav2Vec2Processor,
-    Wav2Vec2Model,
     Wav2Vec2FeatureExtractor,
-    AutoModelForAudioClassification,
-    AutoFeatureExtractor,
-    pipeline
+    Wav2Vec2Model
 )
 
 # =========================================================
@@ -64,17 +60,14 @@ class WhisperASR(torch.nn.Module):
             # Get logits for language tokens
             logits = self.model.proj_out(encoder_outputs.last_hidden_state[:, 0])
 
-            # Whisper language tokens start from this index
-            lang_token_start = self.processor.tokenizer.lang_to_id["en"]
+            # Get most probable language token ID
+            lang_id = logits.argmax(dim=-1).item()
             
-            # Extract only language token logits
-            lang_logits = logits[:, lang_token_start : lang_token_start + len(self.processor.tokenizer.lang_to_id)]
-
-            # Get most probable language
-            lang_id = lang_logits.argmax(dim=-1).item()
-
-            # Map id → language code
-            lang_code = list(self.processor.tokenizer.lang_to_id.keys())[lang_id]
+            # Convert token ID to language code
+            lang_code = self.processor.tokenizer.convert_ids_to_tokens(lang_id)
+            
+            # Clean the language code (remove special tokens)
+            language = lang_code.replace("<|", "").replace("|>", "")
 
             # Map to full language names
             lang_names = {
@@ -93,7 +86,7 @@ class WhisperASR(torch.nn.Module):
                 "no": "Norwegian", "fi": "Finnish", "fa": "Persian"
             }
             
-            return lang_names.get(lang_code, lang_code.upper())
+            return lang_names.get(language, language.upper())
         except Exception as e:
             print(f"Language detection error: {e}")
             return "Unknown"
@@ -106,7 +99,8 @@ class WhisperASR(torch.nn.Module):
 class SpeakerEncoder(torch.nn.Module):
     def __init__(self, model_name="facebook/wav2vec2-large-xlsr-53"):
         super().__init__()
-        self.processor = Wav2Vec2Processor.from_pretrained(model_name)
+        # 🔑 Use FeatureExtractor instead of Processor (no tokenizer needed)
+        self.processor = Wav2Vec2FeatureExtractor.from_pretrained(model_name)
         self.model = Wav2Vec2Model.from_pretrained(model_name).to(DEVICE)
         self.model.eval()
 
