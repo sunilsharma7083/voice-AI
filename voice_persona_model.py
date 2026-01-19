@@ -40,20 +40,17 @@ class WhisperASR(torch.nn.Module):
             return_tensors="pt"
         ).to(DEVICE)
 
-        # Generate with return_dict_in_generate for language detection
+        language = self.detect_language(inputs.input_features)
+
         outputs = self.model.generate(
             inputs.input_features,
-            return_dict_in_generate=True,
-            output_scores=True
+            task="transcribe",
+            language=language
         )
-        
-        ids = outputs.sequences
-        text = self.processor.batch_decode(ids, skip_special_tokens=True)[0]
-        
-        # Detect language from the generated tokens
-        detected_language = self.detect_language(inputs.input_features)
-        
-        return text, detected_language
+
+        text = self.processor.batch_decode(outputs, skip_special_tokens=True)[0]
+
+        return text, language
 
     @torch.no_grad()
     def detect_language(self, input_features):
