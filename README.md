@@ -195,6 +195,10 @@ for profile in similar:
 
 ## 🐛 Troubleshooting
 
+### ValueError: Unsupported language
+**Cause**: Attempting to decode generated tokens as language (e.g., ".." or special tokens)
+**Solution**: Use `processor.tokenizer.detect_language()` which returns language probabilities, then use `max()` to get the most probable language
+
 ### IndexError: index out of bounds in predicted_ids
 **Cause**: Manually accessing token positions assumes fixed Whisper output structure
 **Solution**: Use `processor.tokenizer.detect_language()` official API instead
@@ -245,14 +249,15 @@ pip install --upgrade transformers torch torchaudio
 ### Common Question: "How do you detect language in Whisper?"
 
 **Answer**:
-"I use Whisper's official built-in API: `processor.tokenizer.detect_language(input_features)`. Manually accessing token positions like `predicted_ids[0][1]` is unreliable because Whisper's output structure varies based on the audio and generation parameters. The official API is stable, production-ready, and matches OpenAI's reference implementation."
+"I use Whisper's official built-in API: `processor.tokenizer.detect_language(input_features)`, which returns probability distributions for all supported languages. I then extract the most probable language using `max(lang_probs[0], key=lang_probs[0].get)` and pass it to the generate function. This approach avoids token decoding errors and is the standard method used in OpenAI's implementation. Never decode generated tokens as languages—that causes 'Unsupported language' errors."
 
 ### Technical Highlights:
 - **Whisper Input**: Requires 1D float arrays (T,) not (1, T)
-- **Language Detection**: Uses Whisper's official `processor.tokenizer.detect_language()` API
+- **Language Detection**: Uses `detect_language()` API returning probability dict, extract max probability language
+- **No Token Decoding**: Never decode tokens for language detection (causes "Unsupported language" errors)
 - **Speaker Embeddings**: Wav2Vec2FeatureExtractor (not Processor) to avoid tokenizer errors
 - **Age Estimation**: Heuristic-based using pitch, energy, and spectral features
-- **No Token Index Assumptions**: Avoids brittle token position-based detection
+- **Production Pattern**: Language probabilities → max → pass to generate() with task and language params
 
 ## 📄 License
 

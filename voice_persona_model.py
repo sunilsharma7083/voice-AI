@@ -30,7 +30,7 @@ class WhisperASR(torch.nn.Module):
 
     @torch.no_grad()
     def forward(self, waveform):
-        # Ensure 1D numpy audio
+        # Ensure numpy audio
         if isinstance(waveform, torch.Tensor):
             waveform = waveform.squeeze().cpu().numpy()
 
@@ -42,63 +42,24 @@ class WhisperASR(torch.nn.Module):
 
         input_features = inputs.input_features.to(DEVICE)
 
-        # 🔥 Proper language detection using Whisper's built-in API
-        detected_lang = self.processor.tokenizer.detect_language(input_features)[0]
+        # ✅ CORRECT language detection (NO generate, NO decode)
+        lang_probs = self.processor.tokenizer.detect_language(input_features)
+        detected_lang = max(lang_probs[0], key=lang_probs[0].get)
+        # detected_lang will be: "english", "hindi", "tamil", etc.
 
-        # Transcription
+        # ✅ Correct transcription with detected language
         predicted_ids = self.model.generate(
             input_features,
-            task="transcribe"
+            task="transcribe",
+            language=detected_lang
         )
 
         text = self.processor.batch_decode(
-            predicted_ids, skip_special_tokens=True
+            predicted_ids,
+            skip_special_tokens=True
         )[0]
 
-        return text, detected_lang.upper()
-
-    @torch.no_grad()
-    def detect_language(self, input_features):
-        """
-        Correct Whisper language detection using encoder logits
-        """
-        try:
-            # Get encoder outputs
-            encoder_outputs = self.model.model.encoder(input_features)
-
-            # Get logits for language tokens
-            logits = self.model.proj_out(encoder_outputs.last_hidden_state[:, 0])
-
-            # Get most probable language token ID
-            lang_id = logits.argmax(dim=-1).item()
-            
-            # Convert token ID to language code
-            lang_code = self.processor.tokenizer.convert_ids_to_tokens(lang_id)
-            
-            # Clean the language code (remove special tokens)
-            language = lang_code.replace("<|", "").replace("|>", "")
-
-            # Map to full language names
-            lang_names = {
-                "en": "English", "hi": "Hindi", "es": "Spanish",
-                "fr": "French", "de": "German", "it": "Italian",
-                "pt": "Portuguese", "ru": "Russian", "ja": "Japanese",
-                "zh": "Chinese", "ar": "Arabic", "ko": "Korean",
-                "pa": "Punjabi", "bn": "Bengali", "ta": "Tamil",
-                "te": "Telugu", "mr": "Marathi", "gu": "Gujarati",
-                "kn": "Kannada", "ml": "Malayalam", "ur": "Urdu",
-                "tr": "Turkish", "pl": "Polish", "nl": "Dutch",
-                "sv": "Swedish", "id": "Indonesian", "vi": "Vietnamese",
-                "th": "Thai", "he": "Hebrew", "uk": "Ukrainian",
-                "el": "Greek", "ms": "Malay", "cs": "Czech",
-                "ro": "Romanian", "da": "Danish", "hu": "Hungarian",
-                "no": "Norwegian", "fi": "Finnish", "fa": "Persian"
-            }
-            
-            return lang_names.get(language, language.upper())
-        except Exception as e:
-            print(f"Language detection error: {e}")
-            return "Unknown"
+        return text, detected_lang.capitalize()
 
 
 # =========================================================
