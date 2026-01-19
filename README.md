@@ -81,6 +81,7 @@ python voice_persona_model.py
 - **Model**: OpenAI Whisper Large V3
 - **Function**: Speech-to-text transcription + language detection
 - **Output**: Transcribed text and detected language
+- **Important**: Converts batched tensors [1, T] to 1D numpy arrays [T] for proper Whisper processing
 
 ### 2. SpeakerEncoder
 - **Model**: Wav2Vec2 XLS-R
@@ -194,6 +195,10 @@ for profile in similar:
 
 ## 🐛 Troubleshooting
 
+### ValueError: operands could not be broadcast together
+**Cause**: Whisper expects 1D audio arrays, not batched tensors [1, T]
+**Solution**: The model automatically converts tensors to 1D numpy arrays
+
 ### CUDA Out of Memory
 ```python
 # Use smaller Whisper model
@@ -225,6 +230,19 @@ pip install --upgrade transformers torch torchaudio
 - [ ] Accent detection
 - [ ] Real-time streaming support
 - [ ] Multi-speaker diarization
+
+## 🎯 Interview Tips
+
+### Common Question: "Why was Whisper failing with broadcast errors?"
+
+**Answer**: 
+"Whisper expects 1D raw audio arrays for processing. I was initially passing batched tensors with shape [1, T], which caused padding broadcast failures during feature extraction. The solution was to convert the batched tensor to a 1D numpy array using `.squeeze().cpu().numpy()` before passing it to the WhisperProcessor. This resolved both transcription and language detection issues."
+
+### Technical Highlights:
+- **Whisper Input**: Requires 1D float arrays (T,) not (1, T)
+- **Language Detection**: Uses Whisper's native token-based detection from generated output
+- **Speaker Embeddings**: Wav2Vec2FeatureExtractor (not Processor) to avoid tokenizer errors
+- **Age Estimation**: Heuristic-based using pitch, energy, and spectral features
 
 ## 📄 License
 

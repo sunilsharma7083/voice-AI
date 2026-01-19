@@ -30,23 +30,33 @@ class WhisperASR(torch.nn.Module):
 
     @torch.no_grad()
     def forward(self, waveform):
+        # 🔧 FIX: Convert [1, T] → [T] for Whisper
+        if isinstance(waveform, torch.Tensor):
+            waveform = waveform.squeeze().cpu().numpy()
+
         inputs = self.processor(
             waveform,
             sampling_rate=SAMPLE_RATE,
             return_tensors="pt"
-        ).to(DEVICE)
-
-        language = self.detect_language(inputs.input_features)
-
-        outputs = self.model.generate(
-            inputs.input_features,
-            task="transcribe",
-            language=language
         )
 
-        text = self.processor.batch_decode(outputs, skip_special_tokens=True)[0]
+        input_features = inputs.input_features.to(DEVICE)
 
-        return text, language
+        predicted_ids = self.model.generate(
+            input_features,
+            task="transcribe"
+        )
+
+        text = self.processor.batch_decode(
+            predicted_ids, skip_special_tokens=True
+        )[0]
+
+        # 🔥 Whisper auto language detection from generated tokens
+        lang_token = predicted_ids[0][1].item()
+        language = self.processor.tokenizer.convert_ids_to_tokens(lang_token)
+        language = language.replace("<|", "").replace("|>", "")
+
+        return text, language.upper()
 
     @torch.no_grad()
     def detect_language(self, input_features):
