@@ -195,6 +195,10 @@ for profile in similar:
 
 ## 🐛 Troubleshooting
 
+### IndexError: index out of bounds in predicted_ids
+**Cause**: Manually accessing token positions assumes fixed Whisper output structure
+**Solution**: Use `processor.tokenizer.detect_language()` official API instead
+
 ### ValueError: operands could not be broadcast together
 **Cause**: Whisper expects 1D audio arrays, not batched tensors [1, T]
 **Solution**: The model automatically converts tensors to 1D numpy arrays
@@ -238,11 +242,17 @@ pip install --upgrade transformers torch torchaudio
 **Answer**: 
 "Whisper expects 1D raw audio arrays for processing. I was initially passing batched tensors with shape [1, T], which caused padding broadcast failures during feature extraction. The solution was to convert the batched tensor to a 1D numpy array using `.squeeze().cpu().numpy()` before passing it to the WhisperProcessor. This resolved both transcription and language detection issues."
 
+### Common Question: "How do you detect language in Whisper?"
+
+**Answer**:
+"I use Whisper's official built-in API: `processor.tokenizer.detect_language(input_features)`. Manually accessing token positions like `predicted_ids[0][1]` is unreliable because Whisper's output structure varies based on the audio and generation parameters. The official API is stable, production-ready, and matches OpenAI's reference implementation."
+
 ### Technical Highlights:
 - **Whisper Input**: Requires 1D float arrays (T,) not (1, T)
-- **Language Detection**: Uses Whisper's native token-based detection from generated output
+- **Language Detection**: Uses Whisper's official `processor.tokenizer.detect_language()` API
 - **Speaker Embeddings**: Wav2Vec2FeatureExtractor (not Processor) to avoid tokenizer errors
 - **Age Estimation**: Heuristic-based using pitch, energy, and spectral features
+- **No Token Index Assumptions**: Avoids brittle token position-based detection
 
 ## 📄 License
 
